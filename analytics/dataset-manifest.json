@@ -1,0 +1,208 @@
+{
+  "version_id": "fe598178-4945-4441-adeb-016009ce7619",
+  "week": "2026-11-09",
+  "classification": "synthetic demonstration data",
+  "extracted_at": "2026-11-09 13:31:50.900254",
+  "tables": {
+    "DimCourse": {
+      "rows": 13,
+      "columns": {
+        "course_id": "string",
+        "course_name": "string",
+        "course_group": "string",
+        "min_size": "int64",
+        "max_size": "int64",
+        "duration_minutes": "int64",
+        "min_age": "int64",
+        "max_age": "int64",
+        "min_grade": "int64",
+        "max_grade": "int64"
+      },
+      "sha256": "c8e51ead6acb4d3f70124e378fd4b7e7778826a34848e646b67f3c97bf7d81ac"
+    },
+    "DimDay": {
+      "rows": 5,
+      "columns": {
+        "day": "date",
+        "weekday_index": "int64",
+        "weekday_name": "string"
+      },
+      "sha256": "17c9283dac83333ad668f28aaa6919a91747b209b41b914facb09127a0ace356"
+    },
+    "DimRoom": {
+      "rows": 10,
+      "columns": {
+        "room_id": "string",
+        "room_name": "string",
+        "room_short_name": "string",
+        "kind": "string",
+        "capacity": "int64",
+        "status": "string"
+      },
+      "sha256": "800f35aca40eb3642174bb111071ffcb6d74c4e2da1a5ea567ac267cb95e5d75"
+    },
+    "DimSlot": {
+      "rows": 8,
+      "columns": {
+        "slot_code": "string",
+        "slot_order": "int64",
+        "start_time": "string",
+        "end_time": "string",
+        "kind": "string",
+        "period": "string",
+        "duration_minutes": "int64",
+        "slot_label": "string"
+      },
+      "sha256": "27fec82183f6f3dab9c1b41e893d04af1f012e1f19b45712fcd34113274fd3af"
+    },
+    "DimStudent": {
+      "rows": 220,
+      "columns": {
+        "student_id": "string",
+        "student_code": "string",
+        "age": "int64",
+        "grade": "int64",
+        "active": "boolean"
+      },
+      "sha256": "164d78e30529432d85b18f0b82d7a42707f8920f07c377430e674cd52d5676ee"
+    },
+    "DimTeacher": {
+      "rows": 16,
+      "columns": {
+        "teacher_id": "string",
+        "teacher_code": "string",
+        "active": "boolean"
+      },
+      "sha256": "b2710a59344cc3621b482b5a9538cc9812d37c4202c5613184ac8ac763b66735"
+    },
+    "DimVersion": {
+      "rows": 1,
+      "columns": {
+        "version_id": "string",
+        "week": "date",
+        "version_status": "string",
+        "version_status_name": "string",
+        "published_at": "dateTime",
+        "confirmation_deadline": "dateTime",
+        "activated_at": "dateTime",
+        "solver_status": "string",
+        "solve_seconds": "double",
+        "hard_conflicts": "int64",
+        "baseline_first_count": "int64",
+        "baseline_any_count": "int64",
+        "preference_improved": "boolean",
+        "stale_confirmations": "int64",
+        "confirmation_mode": "string",
+        "extracted_at": "dateTime"
+      },
+      "sha256": "62e19907288bec1b99045499fbc6812be7507210d5e8b8a6d158eadc35c23fe7"
+    },
+    "FactConfirmation": {
+      "rows": 736,
+      "columns": {
+        "confirmation_task_id": "string",
+        "confirmation_id": "string",
+        "version_id": "string",
+        "week": "date",
+        "version_status": "string",
+        "session_id": "string",
+        "course_id": "string",
+        "teacher_id": "string",
+        "room_id": "string",
+        "day": "date",
+        "slot_code": "string",
+        "user_id": "string",
+        "participant_role": "string",
+        "decision": "string",
+        "created_at": "dateTime",
+        "confirmed_at": "dateTime",
+        "reason": "string",
+        "extracted_at": "dateTime",
+        "confirmation_source": "string",
+        "participant_role_name": "string",
+        "decision_name": "string"
+      },
+      "sha256": "dfc502ad05ec13ae571a722f0bd5a411bcf16821a0af1a0b3af88043414af17b"
+    },
+    "FactDemand": {
+      "rows": 668,
+      "columns": {
+        "request_id": "string",
+        "version_id": "string",
+        "week": "date",
+        "student_id": "string",
+        "course_id": "string",
+        "offering_id": "string",
+        "request_status": "string",
+        "is_approved": "int64",
+        "is_scheduled": "int64",
+        "in_solver_cohort": "int64",
+        "session_id": "string",
+        "teacher_id": "string",
+        "room_id": "string",
+        "scheduled_day": "date",
+        "slot_code": "string",
+        "in_any_preferred_slot": "int64",
+        "in_first_preferred_slot": "int64",
+        "both_confirmed": "int64",
+        "is_effective": "int64",
+        "extracted_at": "dateTime",
+        "preference_band": "string"
+      },
+      "sha256": "e32832e51bd1aae8e9b74612a2a40acf3b94c1aca915d3b6ec987d421c2c6c36"
+    },
+    "FactRoomSlot": {
+      "rows": 400,
+      "columns": {
+        "version_id": "string",
+        "week": "date",
+        "room_id": "string",
+        "day": "date",
+        "weekday_index": "int64",
+        "slot_code": "string",
+        "available_minutes": "int64",
+        "scheduled_sessions": "int64",
+        "planned_minutes": "int64"
+      },
+      "sha256": "187663126c5cf3fde10f04af89837730021e81b765f6d1b4517c7d356d6fead2"
+    },
+    "FactSession": {
+      "rows": 68,
+      "columns": {
+        "session_id": "string",
+        "version_id": "string",
+        "week": "date",
+        "version_status": "string",
+        "course_id": "string",
+        "teacher_id": "string",
+        "room_id": "string",
+        "day": "date",
+        "weekday_index": "int64",
+        "slot_code": "string",
+        "start_time": "string",
+        "end_time": "string",
+        "duration_minutes": "int64",
+        "room_capacity": "int64",
+        "effective_class_capacity": "int64",
+        "student_count": "int64",
+        "extracted_at": "dateTime"
+      },
+      "sha256": "f63cbf26908fb2de28cefe8df89738543d7a6d11b80a0a410cd48658e2189e6d"
+    }
+  },
+  "metrics": {
+    "approved_demands": 668,
+    "fulfilled_demands": 668,
+    "sessions": 68,
+    "first_preferred": 206,
+    "any_preferred": 336,
+    "confirmation_tasks": 736,
+    "accepted_tasks": 736,
+    "planned_minutes": 3010,
+    "available_room_minutes": 17500,
+    "allocated_seats": 1572,
+    "effective_seats": 1360,
+    "hard_conflicts": 0,
+    "covered_slots": 40
+  }
+}

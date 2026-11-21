@@ -1,0 +1,9 @@
+{
+  "version": "0.2.0",
+  "configurations": [{
+    "name": "EduFlow 本地双入口", "type": "debugpy", "request": "launch", "program": "${workspaceFolder}/run.py",
+    "args": ["--no-browser"],
+    "cwd": "${workspaceFolder}", "env": { "PYTHONPATH": "${workspaceFolder}/backend/src" },
+    "envFile": "${workspaceFolder}/.env", "justMyCode": true
+  }]
+}

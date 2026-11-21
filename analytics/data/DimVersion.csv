@@ -1,0 +1,2 @@
+﻿version_id,week,version_status,version_status_name,published_at,confirmation_deadline,activated_at,solver_status,solve_seconds,hard_conflicts,baseline_first_count,baseline_any_count,preference_improved,stale_confirmations,confirmation_mode,extracted_at
+fe598178-4945-4441-adeb-016009ce7619,2026-11-09,ACTIVE,已生效,2026-11-08 13:42:29.842324,2026-11-09 13:42:29.842324,2026-11-08 13:44:01.528932,FEASIBLE,308.762,0,106,209,True,0,模拟账号确认,2026-11-09 13:31:50.900254

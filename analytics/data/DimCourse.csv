@@ -1,0 +1,14 @@
+﻿course_id,course_name,course_group,min_size,max_size,duration_minutes,min_age,max_age,min_grade,max_grade
+262da831-1911-5d92-af23-9a3f81f0915c,艺术,INTEREST,3,20,45,6,16,1,10
+b84372a5-76b7-5b39-8cb1-114092c1aa05,绘画,INTEREST,3,20,45,6,16,1,10
+cf585d51-386c-5caf-aff9-98948658e8f9,书法,INTEREST,3,20,45,6,16,1,10
+3422defb-5786-5eb4-b8ee-19af0b28c241,无人机,INTEREST,3,20,45,6,16,1,10
+bcc3bfeb-0a87-5c4d-8561-079704c05c7b,编程与实验,MAIN,3,20,45,6,16,1,10
+de8450bc-989b-5c56-ad08-8587e467475e,逻辑思维,MAIN,3,20,45,6,16,1,10
+222431f5-018a-530a-a44f-632bc163c8b0,科学知识科普,MAIN,3,20,45,6,16,1,10
+208960d4-ac4a-599c-ad07-c82663df758b,机械原理,MAIN,3,20,45,6,16,1,10
+051dc5dc-0b33-5a6d-b96b-fb7f4594e669,科学小实验,EXTENSION,3,20,45,6,16,1,10
+9236c3c8-2e16-5946-9680-2fc488f66b94,综合课程答疑,QA,3,20,35,6,16,1,10
+5c21c8cc-0007-539c-8ada-d4049edc6cb2,编程,MAIN,3,20,45,6,16,1,10
+925749f1-a715-5e27-aede-fc4bba25a764,通识,INTEREST,3,20,45,6,16,1,10
+c3cdd8bb-fa4e-52cd-bf90-efc7db19905f,逻辑思维实验,INTEREST,3,20,45,6,16,1,10

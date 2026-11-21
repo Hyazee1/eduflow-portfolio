@@ -1,0 +1,9 @@
+-r requirements.in
+-c requirements.lock.txt
+pytest>=8.3,<10
+pytest-cov>=6,<8
+ruff>=0.11,<1
+mypy>=1.15,<2
+import-linter>=2.3,<3
+pip-tools>=7.4,<8
+pip-audit>=2.10.1,<3

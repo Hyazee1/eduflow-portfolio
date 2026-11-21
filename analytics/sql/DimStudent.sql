@@ -1,0 +1,1 @@
+WITH v AS (SELECT id,organization_id,week,status FROM public.schedule_versions WHERE id='__VERSION_ID__') SELECT sp.user_id AS student_id,sp.student_code,sp.age,sp.grade,u.active FROM public.student_profiles sp JOIN public.users u ON u.id=sp.user_id JOIN v ON v.organization_id=sp.organization_id

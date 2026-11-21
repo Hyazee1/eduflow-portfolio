@@ -1,0 +1,77 @@
+已审核需求 = CALCULATE(DISTINCTCOUNT(FactDemand[request_id]), FactDemand[is_approved]=1)
+
+热门课程需求 = IF(RANKX(ALL(DimCourse[course_name]),[已审核需求],,DESC,SKIP)<=5,[已审核需求],BLANK())
+
+已满足需求 = CALCULATE([已审核需求], FactDemand[is_scheduled]=1)
+
+需求满足率 = DIVIDE([已满足需求],[已审核需求])
+
+未满足需求 = [已审核需求]-[已满足需求]
+
+计划课次 = COALESCE(DISTINCTCOUNT(FactSession[session_id]),0)
+
+计划学生人次 = COALESCE(SUM(FactSession[student_count]),0)
+
+计划授课分钟 = COALESCE(SUM(FactSession[duration_minutes]),0)
+
+计划授课小时 = DIVIDE([计划授课分钟],60)
+
+首选命中需求 = COALESCE(CALCULATE([已满足需求],FactDemand[in_first_preferred_slot]=1),0)
+
+任一偏好命中需求 = COALESCE(CALCULATE([已满足需求],FactDemand[in_any_preferred_slot]=1),0)
+
+首选时段命中率 = DIVIDE([首选命中需求],[已满足需求])
+
+任一偏好命中率 = DIVIDE([任一偏好命中需求],[已满足需求])
+
+首选命中提升百分点 = 100*DIVIDE([首选命中需求]-MAX(DimVersion[baseline_first_count]),[已审核需求])
+
+教室时间占用率 = DIVIDE([计划授课分钟],SUM(FactRoomSlot[available_minutes]))
+
+教室座位利用率 = DIVIDE([计划学生人次],SUM(FactSession[room_capacity]))
+
+有效班额填充率 = DIVIDE([计划学生人次],SUM(FactSession[effective_class_capacity]))
+
+平均班级人数 = DIVIDE([计划学生人次],[计划课次])
+
+应覆盖时段数 = COUNTROWS(VALUES(DimDay[day]))*COUNTROWS(VALUES(DimSlot[slot_code]))
+
+已覆盖时段数 = SUMX(CROSSJOIN(VALUES(DimDay[day]),VALUES(DimSlot[slot_code])),IF(CALCULATE([计划课次])>0,1,0))
+
+时段覆盖率 = DIVIDE([已覆盖时段数],[应覆盖时段数])
+
+未覆盖时段数 = [应覆盖时段数]-[已覆盖时段数]
+
+应确认事项 = COALESCE(DISTINCTCOUNT(FactConfirmation[confirmation_task_id]),0)
+
+已同意事项 = CALCULATE([应确认事项],KEEPFILTERS(FactConfirmation[decision]="ACCEPTED"))
+
+待处理事项 = CALCULATE([应确认事项],KEEPFILTERS(FactConfirmation[decision] IN {"PENDING","MISSING","STALE"}))
+
+确认完成率 = DIVIDE([已同意事项],[应确认事项])
+
+硬约束冲突数 = COALESCE(MAX(DimVersion[hard_conflicts]),0)
+
+过期确认指纹 = COALESCE(MAX(DimVersion[stale_confirmations]),0)
+
+教师日授课数 = CALCULATE([计划课次],REMOVEFILTERS(DimRoom),REMOVEFILTERS(DimCourse))
+
+教师日休息时段 = IF(HASONEVALUE(DimTeacher[teacher_id])&&HASONEVALUE(DimDay[day]),8-[教师日授课数])
+
+已排教师数 = DISTINCTCOUNT(FactSession[teacher_id])
+
+已用教室数 = DISTINCTCOUNT(FactSession[room_id])
+
+课表状态 = SELECTEDVALUE(DimVersion[version_status_name])
+
+发布时间 = FORMAT(MAX(DimVersion[published_at]),"HH:mm:ss")
+
+生效时间 = FORMAT(MAX(DimVersion[activated_at]),"HH:mm:ss")
+
+模拟确认标识 = SELECTEDVALUE(DimVersion[confirmation_mode])
+
+报表范围 = "模拟数据 · " & FORMAT(MAX(DimVersion[week]),"yyyy-MM-dd") & " 周 · " & SELECTEDVALUE(DimVersion[version_status_name]) & " · " & SELECTEDVALUE(DimVersion[confirmation_mode])
+
+独立学生数 = DISTINCTCOUNT(FactDemand[student_id])
+
+核验值 = SWITCH(SELECTEDVALUE(CheckList[check_code]),"HARD",[硬约束冲突数],"UNMET",[未满足需求],"UNCOVERED",[未覆盖时段数],"PENDING",[待处理事项],"STALE",[过期确认指纹])

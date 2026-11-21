@@ -1,0 +1,123 @@
+name: eduflow-ai
+x-logging: &logging
+  driver: json-file
+  options: {max-size: "10m", max-file: "3"}
+x-application: &application
+  image: eduflow-local:privacy
+  build:
+    context: .
+    dockerfile: backend/Dockerfile
+  restart: unless-stopped
+  logging: *logging
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 256
+  tmpfs: [/tmp]
+  environment: &runtime
+    DATABASE_URL_FILE: /run/secrets/application_database
+    REDIS_URL: redis://redis:6379/0
+    AGENT_MODE: offline
+    PUBLIC_ACCESS_ENABLED: "false"
+    ORGANIZATION_SLUG: ${ORGANIZATION_SLUG:-demo}
+    INITIALIZATION_MODE: ${INITIALIZATION_MODE:-demo}
+    PRIVATE_DIR: /private
+  depends_on:
+    postgres: {condition: service_healthy}
+    redis: {condition: service_healthy}
+services:
+  postgres:
+    logging: *logging
+    image: postgres:16@sha256:1beaa3084eee2676f20a9cd9928f0bf2c5bf674f8e49f81017912183d377c61c
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-eduflow}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_DB: ${POSTGRES_DB:-eduflow_ai}
+    secrets: [postgres_password]
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  redis:
+    logging: *logging
+    image: redis:7-alpine@sha256:8da19c7399dca900c6822a1cf30f9d2285585e2c4b457ff4095b0f4500054d3f
+    command: [redis-server, --appendonly, "yes"]
+    ports: ["127.0.0.1:6379:6379"]
+    volumes: [redis_data:/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  worker:
+    <<: *application
+    environment:
+      <<: *runtime
+      PORTAL: WORKER
+      BACKUP_KEY_FILE: /run/secrets/backup_key
+    secrets: [application_database, backup_key]
+    volumes: [./.runtime/private/backups:/private/backups]
+    command: [celery, -A, eduflow.bootstrap.worker:celery_app, worker, --loglevel=WARNING, --concurrency=2]
+  beat:
+    <<: *application
+    environment:
+      <<: *runtime
+      PORTAL: WORKER
+    secrets: [application_database]
+    command: [celery, -A, eduflow.bootstrap.worker:celery_app, beat, --loglevel=WARNING, --schedule=/tmp/celerybeat-schedule]
+  admin-api:
+    <<: *application
+    environment:
+      <<: *runtime
+      PORTAL: ADMIN
+      JWT_SECRET_FILE: /run/secrets/admin_signing
+    secrets: [application_database, admin_signing]
+    ports: ["127.0.0.1:8000:8000"]
+    command: [uvicorn, eduflow.bootstrap.app:create_admin_app, --factory, --host, "0.0.0.0", --port, "8000", --no-proxy-headers, --no-access-log, --timeout-keep-alive, "15"]
+    healthcheck: &api-health
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=5)"]
+      interval: 5s
+      timeout: 8s
+      retries: 30
+  public-api:
+    <<: *application
+    environment:
+      <<: *runtime
+      PORTAL: PUBLIC
+      JWT_SECRET_FILE: /run/secrets/public_signing
+    secrets: [application_database, public_signing]
+    ports: ["127.0.0.1:8100:8000"]
+    command: [uvicorn, eduflow.bootstrap.app:create_public_app, --factory, --host, "0.0.0.0", --port, "8000", --no-proxy-headers, --no-access-log, --timeout-keep-alive, "15"]
+    healthcheck: *api-health
+  maintenance:
+    <<: *application
+    profiles: [tools]
+    environment:
+      <<: *runtime
+      PORTAL: WORKER
+      DATABASE_URL_FILE: /run/secrets/maintenance_database
+      BACKUP_KEY_FILE: /run/secrets/backup_key
+    secrets: [maintenance_database, backup_key]
+    volumes: [./.runtime/private/backups:/private/backups]
+    command: [python, -m, eduflow.bootstrap.cli, backup]
+secrets:
+  postgres_password:
+    file: ./.runtime/private/secrets/postgres.password
+  application_database:
+    file: ./.runtime/private/secrets/application.url
+  maintenance_database:
+    file: ./.runtime/private/secrets/maintenance.url
+  admin_signing:
+    file: ./.runtime/private/secrets/admin.key
+  public_signing:
+    file: ./.runtime/private/secrets/public.key
+  backup_key:
+    file: ./.runtime/private/secrets/backup.key
+volumes:
+  postgres_data:
+  redis_data:

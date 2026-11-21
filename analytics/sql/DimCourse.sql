@@ -1,0 +1,1 @@
+WITH v AS (SELECT id,organization_id,week,status FROM public.schedule_versions WHERE id='__VERSION_ID__') SELECT c.id AS course_id,c.name AS course_name,c.course_group,c.min_size,c.max_size,c.duration AS duration_minutes,c.min_age,c.max_age,c.min_grade,c.max_grade FROM public.courses c JOIN v ON v.organization_id=c.organization_id

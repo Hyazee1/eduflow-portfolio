@@ -1,0 +1,11 @@
+﻿room_id,room_name,room_short_name,kind,capacity,status
+8d4d3d10-2514-5434-b46a-11a737eafb42,计算机教室 A,计算机A,COMPUTER,24,OPEN
+c0a06461-83c1-53e3-96ba-1a9d4e035474,计算机教室 B,计算机B,COMPUTER,24,OPEN
+162ec19d-c529-57e6-8c98-04caa7b523ec,科学实验室 A,科学A,LAB,20,OPEN
+40a3660a-ac98-5bce-9cea-76bd1bfd9216,科学实验室 B,科学B,LAB,20,OPEN
+43aee376-bf94-5cc4-8362-4c35ddd128fe,无人机与机器人实验室,无人机,DRONE,20,OPEN
+fb08c2a8-0721-5677-8c9f-a15e489bde7c,艺术绘画教室,艺术绘画,ART,24,OPEN
+7e0274b2-638d-57b5-a590-454852637d72,书法教室,书法,CALLIGRAPHY,24,OPEN
+9c2046ae-60f9-51cd-8f7b-c8213fa30047,普通教学教室 A,普通教学A,GENERAL,24,OPEN
+074c9c0c-b69a-5b77-ab6f-84e13e433136,普通教学教室 B,普通教学B,GENERAL,24,OPEN
+a26ebc5f-f283-562b-8351-4ae554f38a4f,多功能教室,多功能,MULTIPURPOSE,28,OPEN
