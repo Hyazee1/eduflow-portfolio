@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT / "backend/src"))
 from alembic import command
 from alembic.config import Config
 from argon2 import PasswordHasher
+from dotenv import dotenv_values
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
@@ -61,14 +62,19 @@ def main() -> None:
     )
     initial_clock = datetime.combine(today, datetime.min.time(), SHANGHAI).isoformat()
     (runtime / "e2e-clock.json").write_text(json.dumps({"now": initial_clock}), encoding="utf-8")
-    env = {
-        "DATABASE_URL": target.set(host="postgres").render_as_string(hide_password=False),
-        "REDIS_URL": "redis://redis:6379/8",
-        "JWT_SECRET": secret,
-    }
-    (runtime / "private/e2e.env").write_text(
-        "\n".join(key + "=" + value for key, value in env.items()) + "\n", encoding="utf-8"
+    private = runtime / "private"
+    deployment = {**dotenv_values(ROOT / ".env"), **os.environ}
+    redis = make_url((private / "secrets/redis.url").read_text(encoding="utf-8").strip()).set(database="8")
+    host_redis = make_url((private / "secrets/redis.host.url").read_text(encoding="utf-8").strip()).set(
+        database="8"
     )
+    secret_files = {
+        "e2e_database": target.set(host="postgres", port=5432).render_as_string(hide_password=False),
+        "e2e_redis": redis.render_as_string(hide_password=False),
+    }
+    for name, value in secret_files.items():
+        (private / name).write_text(value, encoding="utf-8")
+        (private / name).chmod(0o600)
     info = {
         "week": str(week),
         "date": str(today),
@@ -81,40 +87,46 @@ def main() -> None:
     (runtime / "private/e2e-api.env").write_text(
         "DATABASE_URL="
         + target.render_as_string(hide_password=False)
-        + "\nREDIS_URL=redis://127.0.0.1:6379/8\nJWT_SECRET="
+        + "\nREDIS_URL="
+        + host_redis.render_as_string(hide_password=False)
+        + "\nJWT_SECRET="
         + secret
         + "\n",
         encoding="utf-8",
     )
     services = {}
-    for name, image, action in (
-        ("worker", "eduflow-local:privacy", "worker"),
-        ("beat", "eduflow-local:privacy", "beat"),
-    ):
+    for name in ("worker", "beat"):
         services[name] = {
-            "image": image,
-            "env_file": [str(runtime / "private/e2e.env")],
+            "image": deployment.get("EDUFLOW_APP_IMAGE") or "eduflow-local:privacy",
+            "environment": {
+                "PORTAL": "WORKER",
+                "DATABASE_URL_FILE": "/run/secrets/e2e_database",
+                "REDIS_URL_FILE": "/run/secrets/e2e_redis",
+            },
+            "secrets": list(secret_files),
             "command": [
                 "celery",
                 "-A",
                 "eduflow.bootstrap.worker:celery_app",
-                action,
+                name,
                 "--loglevel=WARNING",
-                *(["--concurrency=2"] if action == "worker" else ["--schedule=/tmp/celerybeat-schedule"]),
+                *(["--concurrency=2"] if name == "worker" else ["--schedule=/tmp/celerybeat-schedule"]),
             ],
-            "volumes": [
-                {
-                    "type": "bind",
-                    "source": str(ROOT / "backend/src"),
-                    "target": "/app/backend/src",
-                    "read_only": True,
-                }
-            ],
+            "read_only": True,
+            "tmpfs": ["/tmp"],
+            "cap_drop": ["ALL"],
+            "security_opt": ["no-new-privileges:true"],
         }
     compose = {
-        "name": "eduflow-e2e",
+        "name": deployment.get("EDUFLOW_E2E_PROJECT") or "eduflow-e2e",
         "services": services,
-        "networks": {"default": {"external": True, "name": "eduflow-ai_default"}},
+        "secrets": {k: {"file": str(private / k)} for k in secret_files},
+        "networks": {
+            "default": {
+                "external": True,
+                "name": (deployment.get("COMPOSE_PROJECT_NAME") or "eduflow-ai") + "_default",
+            }
+        },
     }
     (runtime / "e2e-compose.json").write_text(json.dumps(compose, indent=2), encoding="utf-8")
     print("Isolated E2E database and private runtime config prepared; week=" + str(week))

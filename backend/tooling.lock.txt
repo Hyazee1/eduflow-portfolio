@@ -1,3 +1,3 @@
-# Project virtual-environment installer, verified against the PyPI 26.2 release.
-# https://pypi.org/project/pip/26.2/
-pip==26.2 --hash=sha256:931c303696af6fa3417112103b1cad26890e5a07eccb5b99783700e33f2b8aad
+# Installer for Windows development and the Linux build stage.
+# https://pypi.org/project/pip/26.3/
+pip==26.3 --hash=sha256:f3b60b20ffaadd4415ed7957212a38ac63fa4c5fa375bd0f4a797777940fad13

@@ -1,6 +1,7 @@
 """Test-only clock control; refuses to run against any application database."""
 
 import json
+import os
 from datetime import datetime
 
 from fastapi import HTTPException
@@ -18,10 +19,12 @@ class FileClock:
 def _create_e2e(portal):
     settings = Settings(
         portal=portal,
-        admin_portal_origin="http://127.0.0.1:8001",
-        public_portal_origin="http://127.0.0.1:8101",
         _env_file=ROOT / ".runtime/private/e2e-api.env",
-        portal_origin="http://127.0.0.1:" + ("8001" if portal == "ADMIN" else "8101"),
+        portal_origin=(
+            os.getenv("EDUFLOW_E2E_URL", "http://127.0.0.1:8001")
+            if portal == "ADMIN"
+            else os.getenv("EDUFLOW_E2E_PUBLIC_URL", "http://127.0.0.1:8101")
+        ),
         frontend_dir=ROOT / "frontend/dist" / portal.lower(),
     )
     if make_url(settings.database_url).database != "eduflow_ai_e2e_test":

@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 $env:PYTHONUTF8 = "1"
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 Set-Location -LiteralPath $PSScriptRoot
+& (Join-Path $PSScriptRoot 'scripts/protect_config.ps1') -CreateEnvironment
 $projectPython = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
 if (-not (Test-Path -LiteralPath $projectPython)) {
     if ($Python312) {
@@ -32,21 +33,6 @@ try {
     & npm.cmd run build
     if ($LASTEXITCODE -ne 0) { throw "前端构建失败" }
 } finally { Pop-Location }
-if (-not (Test-Path -LiteralPath ".env")) {
-    $configScript = @'
-from pathlib import Path
-import secrets
-password = secrets.token_hex(24)
-text = Path(".env.example").read_text(encoding="utf-8")
-text = text.replace("eduflow_local", password)
-text = text.replace("replace-with-at-least-32-random-characters", secrets.token_urlsafe(48))
-with Path(".env").open("x", encoding="utf-8") as target:
-    target.write(text)
-print("已生成本地 .env，未输出任何密钥。")
-'@
-    $configScript | & $projectPython -
-    if ($LASTEXITCODE -ne 0) { throw "生成环境配置失败" }
-}
 if (-not $SkipContainers) {
     & $projectPython run.py --prepare-only
     if ($LASTEXITCODE -ne 0) { throw "容器与数据库初始化未完成，请查看上方提示" }

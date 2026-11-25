@@ -3,7 +3,7 @@ x-logging: &logging
   driver: json-file
   options: {max-size: "10m", max-file: "3"}
 x-application: &application
-  image: eduflow-local:privacy
+  image: ${EDUFLOW_APP_IMAGE:-eduflow-local:privacy}
   build:
     context: .
     dockerfile: backend/Dockerfile
@@ -16,7 +16,7 @@ x-application: &application
   tmpfs: [/tmp]
   environment: &runtime
     DATABASE_URL_FILE: /run/secrets/application_database
-    REDIS_URL: redis://redis:6379/0
+    REDIS_URL_FILE: /run/secrets/redis_url
     AGENT_MODE: offline
     PUBLIC_ACCESS_ENABLED: "false"
     ORGANIZATION_SLUG: ${ORGANIZATION_SLUG:-demo}
@@ -28,13 +28,14 @@ x-application: &application
 services:
   postgres:
     logging: *logging
-    image: postgres:16@sha256:1beaa3084eee2676f20a9cd9928f0bf2c5bf674f8e49f81017912183d377c61c
+    image: ${EDUFLOW_POSTGRES_IMAGE:-eduflow-postgres:16.16-r1}
+    build: ./infra/postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-eduflow}
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
       POSTGRES_DB: ${POSTGRES_DB:-eduflow_ai}
     secrets: [postgres_password]
-    ports: ["127.0.0.1:5432:5432"]
+    ports: ["127.0.0.1:${EDUFLOW_POSTGRES_PORT:-5432}:5432"]
     volumes: [postgres_data:/var/lib/postgresql/data]
     healthcheck:
       test: [CMD-SHELL, "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
@@ -44,12 +45,13 @@ services:
     restart: unless-stopped
   redis:
     logging: *logging
-    image: redis:7-alpine@sha256:8da19c7399dca900c6822a1cf30f9d2285585e2c4b457ff4095b0f4500054d3f
-    command: [redis-server, --appendonly, "yes"]
-    ports: ["127.0.0.1:6379:6379"]
+    image: ${EDUFLOW_REDIS_IMAGE:-eduflow-redis:7.4.12-r1}
+    build: ./infra/redis
+    command: [redis-server, --appendonly, "yes", --aclfile, /run/secrets/redis_acl]
+    secrets: [redis_acl, redis_health]
     volumes: [redis_data:/data]
     healthcheck:
-      test: [CMD, redis-cli, ping]
+      test: [CMD-SHELL, 'REDISCLI_AUTH="$$(cat /run/secrets/redis_health)" redis-cli --user health PING | grep -qx PONG']
       interval: 5s
       timeout: 3s
       retries: 20
@@ -60,7 +62,7 @@ services:
       <<: *runtime
       PORTAL: WORKER
       BACKUP_KEY_FILE: /run/secrets/backup_key
-    secrets: [application_database, backup_key]
+    secrets: [application_database, redis_url, backup_key]
     volumes: [./.runtime/private/backups:/private/backups]
     command: [celery, -A, eduflow.bootstrap.worker:celery_app, worker, --loglevel=WARNING, --concurrency=2]
   beat:
@@ -68,7 +70,7 @@ services:
     environment:
       <<: *runtime
       PORTAL: WORKER
-    secrets: [application_database]
+    secrets: [application_database, redis_url]
     command: [celery, -A, eduflow.bootstrap.worker:celery_app, beat, --loglevel=WARNING, --schedule=/tmp/celerybeat-schedule]
   admin-api:
     <<: *application
@@ -76,8 +78,9 @@ services:
       <<: *runtime
       PORTAL: ADMIN
       JWT_SECRET_FILE: /run/secrets/admin_signing
-    secrets: [application_database, admin_signing]
-    ports: ["127.0.0.1:8000:8000"]
+      PORTAL_ORIGIN: http://127.0.0.1:${EDUFLOW_ADMIN_PORT:-8000}
+    secrets: [application_database, redis_url, admin_signing]
+    ports: ["127.0.0.1:${EDUFLOW_ADMIN_PORT:-8000}:8000"]
     command: [uvicorn, eduflow.bootstrap.app:create_admin_app, --factory, --host, "0.0.0.0", --port, "8000", --no-proxy-headers, --no-access-log, --timeout-keep-alive, "15"]
     healthcheck: &api-health
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=5)"]
@@ -90,22 +93,30 @@ services:
       <<: *runtime
       PORTAL: PUBLIC
       JWT_SECRET_FILE: /run/secrets/public_signing
-    secrets: [application_database, public_signing]
-    ports: ["127.0.0.1:8100:8000"]
+      PORTAL_ORIGIN: http://127.0.0.1:${EDUFLOW_PUBLIC_PORT:-8100}
+    secrets: [application_database, redis_url, public_signing]
+    ports: ["127.0.0.1:${EDUFLOW_PUBLIC_PORT:-8100}:8000"]
     command: [uvicorn, eduflow.bootstrap.app:create_public_app, --factory, --host, "0.0.0.0", --port, "8000", --no-proxy-headers, --no-access-log, --timeout-keep-alive, "15"]
     healthcheck: *api-health
   maintenance:
     <<: *application
     profiles: [tools]
     environment:
-      <<: *runtime
       PORTAL: WORKER
       DATABASE_URL_FILE: /run/secrets/maintenance_database
       BACKUP_KEY_FILE: /run/secrets/backup_key
+      PRIVATE_DIR: /private
     secrets: [maintenance_database, backup_key]
+    # Backup/restore uses only PostgreSQL; this process needs no queue credential.
     volumes: [./.runtime/private/backups:/private/backups]
     command: [python, -m, eduflow.bootstrap.cli, backup]
 secrets:
+  redis_url:
+    file: ./.runtime/private/secrets/redis.url
+  redis_acl:
+    file: ./.runtime/private/secrets/redis.acl
+  redis_health:
+    file: ./.runtime/private/secrets/redis-health.password
   postgres_password:
     file: ./.runtime/private/secrets/postgres.password
   application_database:

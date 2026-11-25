@@ -15,7 +15,8 @@ class Settings(BaseSettings):
         default="postgresql+psycopg://eduflow:eduflow_local@127.0.0.1:5432/eduflow_ai", repr=False
     )
     database_url_file: Path | None = None
-    redis_url: str = "redis://127.0.0.1:6379/0"
+    redis_url: str = Field(default="redis://127.0.0.1:6379/0", repr=False)
+    redis_url_file: Path | None = None
     jwt_secret: str = Field(default="", repr=False)
     jwt_secret_file: Path | None = None
     portal: Literal["ADMIN", "PUBLIC", "TEST", "WORKER"] = "ADMIN"
@@ -52,6 +53,8 @@ class Settings(BaseSettings):
             raise ValueError("Public exposure is disabled in this local portfolio release")
         if self.database_url_file:
             self.database_url = self.database_url_file.read_text(encoding="utf-8").strip()
+        if self.redis_url_file:
+            self.redis_url = self.redis_url_file.read_text(encoding="utf-8").strip()
         if self.jwt_secret_file:
             self.jwt_secret = self.jwt_secret_file.read_text(encoding="utf-8").strip()
         if self.portal == "WORKER" and not self.jwt_secret:

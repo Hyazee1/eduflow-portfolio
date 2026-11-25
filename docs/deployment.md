@@ -2,7 +2,7 @@
 
 ## 依赖和启动
 
-已验证环境为 Windows、Python 3.12.14、Node 26 与 Docker Linux 容器。后端运行时和开发环境分别使用 `backend/requirements.lock.txt`、`backend/requirements-dev.lock.txt`，安装工具使用 `backend/tooling.lock.txt` 固定 pip 26.2 及哈希，前端使用 `frontend/package-lock.json`。基础镜像 digest 固定在 Compose / Dockerfile，应用镜像本机构建。
+使用 Windows、Python 3.12、Node 26 与 Docker Linux 容器。后端运行时和开发环境分别读取 `backend/requirements.lock.txt` 和 `backend/requirements-dev.lock.txt`。安装工具的版本及 SHA-256 见 `backend/tooling.lock.txt`，前端读取 `frontend/package-lock.json`。应用、PostgreSQL 和 Redis 的构建文件分别位于 `backend/Dockerfile`、`infra/postgres/Dockerfile` 和 `infra/redis/Dockerfile`，各自固定上游镜像摘要。pip 仅在应用镜像的构建阶段使用。
 
 `setup.ps1 -Python312 <解释器路径>` 可指定 Python 3.12；`-SkipContainers` 只准备项目依赖与前端。脚本保留已有 `.env`，缺失时生成随机数据库密码和签名密钥。浏览器测试引擎可按需在 frontend 执行 `npm exec playwright install chromium firefox webkit`，将 `PLAYWRIGHT_BROWSERS_PATH` 指向项目 `.runtime/browsers`。
 
@@ -19,12 +19,23 @@ python run.py doctor           # 检查两个入口
 | 管理应用 | 127.0.0.1:8000 | ADMIN，独立密钥与 Cookie |
 | 师生应用 | 127.0.0.1:8100 | TEACHER / STUDENT，管理路由不存在 |
 | PostgreSQL16 | 127.0.0.1:5432 | 本地命名卷 postgres_data |
-| Redis7 | 127.0.0.1:6379 | 本地命名卷 redis_data，默认业务 DB0 |
+| Redis 7 | Compose 内部网络 | 命名卷 redis_data，业务 DB0，应用账号须认证，健康检查账号仅可执行 PING |
 | Worker / Beat | 容器网络 | 一个求解占用名额，并发 2 保留轻任务处理余量 |
 
 应用镜像以 UID10001 运行，根文件系统只读、移除 capability、禁止提权，临时文件只在 /tmp。HTTP 应用仅得到自己的签名密钥与 DML 数据库连接；Worker 不得到 HTTP 密钥，维护容器才具有恢复所需的数据库创建权限。没有 Docker socket 或个人目录挂载。
 
-端口占用会提示冲突。在本项目根目录执行 `docker compose stop` 可停止服务并保留数据卷。迁移失败时，启动器保留升级前加密备份和私有启动日志，并停止后续步骤。
+Windows 启动器保护现有 `.env` 的访问控制列表，保留文件内容。新配置在受保护目录中生成，再移到项目根目录。NTFS 只向当前用户和 SYSTEM 授权。Redis 凭据按用途写入 `.runtime/private/secrets`，容器只挂载所需的文件。
+
+仅在宿主机调试 API 或运行浏览器测试时，用下列命令开启 Redis 的回环端口。先完成默认启动。多个副本同时运行时，沿用该实例的 Compose 项目名，设置独占的 `EDUFLOW_REDIS_PORT`，调用 `scripts/runtime_config.py --files-only` 更新本机连接文件，再执行以下命令。
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --wait redis
+$env:REDIS_URL_FILE = (Resolve-Path -LiteralPath '.runtime/private/secrets/redis.host.url').Path
+```
+
+调试完成后，执行 `docker compose -f docker-compose.yml up -d --wait redis` 恢复内部访问，并在调试终端执行 `Remove-Item Env:REDIS_URL_FILE`。DataGrip 仍通过回环 PostgreSQL 端口访问机构数据库。
+
+**复用验收过的镜像**。在私有配置中，把 `EDUFLOW_APP_IMAGE`、`EDUFLOW_POSTGRES_IMAGE` 和 `EDUFLOW_REDIS_IMAGE` 分别设为本机已验收的完整 `仓库名@sha256:摘要`，再运行 `python run.py --no-browser`。启动器检查三种镜像在本机可用，并使用这些镜像启动。两端已就绪时也会核对六个运行容器的镜像身份。保留移交清单中的完整引用和对应归档，以便在另一台机器加载同一批镜像。
 
 ## 空机构初始化
 
@@ -45,6 +56,10 @@ python run.py restore --archive <文件名.dump.enc> --target <全新名称_test
 ```
 
 备份在 `.runtime/private/backups`，采用 PostgreSQL16 自定义格式与 cryptography Fernet 认证加密。密钥 `.runtime/private/secrets/backup.key` 单独保存；丢失密钥无法恢复，泄露时应重新制定备份策略。备份归档不能代替单独保存密钥，也不能把二者一起公开。
+
+**替换正在使用的服务前**，在维护窗口暂停新业务写入，停止定时投递，等待已接收的任务结束，再暂停 Worker。用原 PostgreSQL 实例生成加密备份并试恢复，记录镜像 ID、配置和两个卷的对应关系。干净停止原实例后，复制两个卷，用候选镜像和副本卷单独启动。核对 PostgreSQL 排序规则版本、有效课表、逐课确认、资源预订、两端健康状态、队列及 DataGrip 连接后，再开放写入。原实例或受保护备份、配套密钥必须可用。
+
+启动器在替换已有 PostgreSQL 容器前使用原实例的 `pg_dump` 备份。遇到只有数据卷、无法确认原镜像身份的情况会停止。升级或验收失败且尚未开放写入时，关闭候选实例，恢复匹配的原配置、镜像和原卷。已有新写入时，先冻结并备份增量，核对恢复与补录结果后再切换。日常停止用 `docker compose stop` 保留卷。
 
 恢复只允许新的 *_test / *_restored 数据库，拒绝现有库和应用库；先解密认证，再创建库并以单事务恢复。恢复验证后若要切换正式库，由操作者明确调整私有连接配置并重启，不自动覆盖当前服务。
 

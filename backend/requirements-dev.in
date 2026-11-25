@@ -6,4 +6,6 @@ ruff>=0.11,<1
 mypy>=1.15,<2
 import-linter>=2.3,<3
 pip-tools>=7.4,<8
+# pip-tools needs setuptools when reproducing this lock from a local wheelhouse.
+setuptools>=78.1.1
 pip-audit>=2.10.1,<3

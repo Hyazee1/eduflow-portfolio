@@ -56,7 +56,14 @@ def private_values(root: Path) -> list[str]:
             key, _, value = line.partition("=")
             if key in {"JWT_SECRET", "POSTGRES_PASSWORD", "LLM_API_KEY"} and len(value.strip()) >= 12:
                 values.append(value.strip().strip("\"'"))
-    for name in ("admin.key", "public.key", "backup.key", "application.password"):
+    for name in (
+        "admin.key",
+        "public.key",
+        "backup.key",
+        "application.password",
+        "redis.password",
+        "redis-health.password",
+    ):
         path = root / ".runtime/private/secrets" / name
         if path.is_file():
             value = path.read_text(encoding="utf-8").strip()

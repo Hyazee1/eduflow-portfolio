@@ -1,0 +1,4 @@
+# Explicit opt-in for host-side API/debugger and E2E processes.
+services:
+  redis:
+    ports: ["127.0.0.1:${EDUFLOW_REDIS_PORT:-6379}:6379"]

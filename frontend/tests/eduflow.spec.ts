@@ -113,7 +113,7 @@ test('27-step real API, PostgreSQL, Celery and three-role browser journey', asyn
   let courses: Data[] = []; let move: Data; let change: Data; let adjustedId = '';
   try {
     await step(1, '一键启动后的服务健康', async () => {
-      const health = await fetch('http://127.0.0.1:8000/health/ready');
+      const health = await fetch(base + '/health/ready');
       expect(health.status).toBe(200);
       expect((await health.json()).status).toBe('ready');
     });

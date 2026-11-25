@@ -6,6 +6,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -19,7 +20,6 @@ from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parent
 PYTHON = ROOT / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-ENDPOINTS = [("ADMIN", 8000), ("PUBLIC", 8100)]
 
 
 def docker_path() -> str:
@@ -45,6 +45,15 @@ def ready(portal: str, port: int) -> bool:
         return value.get("status") == "ready" and value.get("portal") == portal
     except (URLError, ValueError, OSError):
         return False
+
+
+def verified_image_refs(config: dict) -> dict[str, str]:
+    refs = {name: service["image"] for name, service in config["services"].items() if "image" in service}
+    if not any("@" in ref for ref in refs.values()):
+        return {}
+    if not all(re.fullmatch(r"[^\s@]+@sha256:[0-9a-f]{64}", ref) for ref in refs.values()):
+        raise RuntimeError("按摘要启动时，应用、PostgreSQL 和 Redis 都须指定完整的 SHA-256 镜像引用。")
+    return refs
 
 
 def execute(command: list[str], env: dict[str, str], title: str) -> None:
@@ -84,14 +93,23 @@ def main() -> int:
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--rebuild", action="store_true", help="代码更新后备份、迁移并重建本地应用")
-    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--port", type=int, help="Check the configured admin port")
     parser.add_argument("--archive")
     parser.add_argument("--target")
     args = parser.parse_args()
-    if args.port != 8000:
-        raise RuntimeError("双入口版本使用已验证的本机 8000/8100 端口；不自动修改网络暴露配置。")
     if not PYTHON.is_file() or not (ROOT / ".env").is_file():
         raise RuntimeError("项目环境或私有配置缺失，请先执行 setup.ps1。")
+    if os.name == "nt":
+        subprocess.run(
+            [
+                shutil.which("pwsh") or "powershell",
+                "-NoProfile",
+                "-NonInteractive",
+                "-File",
+                str(ROOT / "scripts/protect_config.ps1"),
+            ],
+            check=True,
+        )
     env = dict(os.environ, PYTHONPATH=str(ROOT / "backend/src"), PYTHONUTF8="1", PYTHONUNBUFFERED="1")
     execute(
         [str(PYTHON), "-c", "from eduflow.bootstrap.settings import Settings; Settings()"],
@@ -104,18 +122,40 @@ def main() -> int:
     )
     if probe.returncode or probe.stdout.strip() != "linux":
         raise RuntimeError("Docker Linux 引擎尚未就绪，请打开 Docker Desktop，等待 Engine running。")
+    compose = [docker, "compose", "-f", str(ROOT / "docker-compose.yml")]
+    config = json.loads(subprocess.check_output([*compose, "config", "--format", "json"], cwd=ROOT, env=env))
+    endpoints = []
+    for portal, service in (("ADMIN", "admin-api"), ("PUBLIC", "public-api")):
+        bindings = config["services"][service]["ports"]
+        if len(bindings) != 1 or bindings[0]["host_ip"] != "127.0.0.1":
+            raise RuntimeError("The portfolio requires loopback-only HTTP listeners.")
+        endpoints.append((portal, int(bindings[0]["published"])))
+    if args.port is not None and args.port != endpoints[0][1]:
+        raise RuntimeError("Requested admin port differs from the Compose configuration.")
     if args.action == "doctor":
-        for portal, port in ENDPOINTS:
+        for portal, port in endpoints:
             print(portal + ": " + ("ready" if ready(portal, port) else "not ready"))
         print("公网关闭；无需域名或隧道。")
         return 0
-    compose = [docker, "compose", "-f", str(ROOT / "docker-compose.yml")]
+    refs = verified_image_refs(config)
+    identities = {}
+    for ref in set(refs.values()):
+        image = subprocess.run(
+            [docker, "image", "inspect", "--format", "{{.Id}}", ref], env=env, text=True, capture_output=True
+        )
+        if image.returncode or not image.stdout.strip():
+            raise RuntimeError("已验证的镜像摘要在本机缺失，请先恢复或加载对应镜像。")
+        identities[ref] = image.stdout.strip()
+    if refs and args.rebuild:
+        raise RuntimeError("按已验证的摘要启动时，请使用 run.py --no-browser。重新构建请另用测试标签。")
     if args.action in {"backup", "restore"}:
         action = [
             *compose,
             "--profile",
             "tools",
             "run",
+            "--pull",
+            "never" if refs else "missing",
             "--rm",
             "maintenance",
             "python",
@@ -134,14 +174,26 @@ def main() -> int:
             action += ["--archive", "/private/backups/" + archive.name, "--target", args.target]
         execute(action, env, "执行本机加密备份/恢复，保留现有数据库…")
         return 0
-    for portal, port in ENDPOINTS:
+    for portal, port in endpoints:
         with socket.socket() as sock:
             occupied = sock.connect_ex(("127.0.0.1", port)) == 0
         if occupied and not ready(portal, port):
             raise RuntimeError(
                 f"本机端口 {port} 已被其他服务或旧版应用占用；请先检查，启动器不会终止其他进程。"
             )
-    if all(ready(portal, port) for portal, port in ENDPOINTS) and not args.prepare_only and not args.rebuild:
+    already_ready = all(ready(portal, port) for portal, port in endpoints)
+    if already_ready and refs:
+        for name in ("postgres", "redis", "admin-api", "public-api", "worker", "beat"):
+            cid = subprocess.check_output([*compose, "ps", "-q", name], cwd=ROOT, env=env, text=True).strip()
+            if (
+                not cid
+                or subprocess.check_output(
+                    [docker, "inspect", "--format", "{{.Image}}", cid], env=env, text=True
+                ).strip()
+                != identities[refs[name]]
+            ):
+                raise RuntimeError("运行中的服务与指定镜像不一致。请先在维护窗口停写、备份并准备副本卷。")
+    if already_ready and not args.prepare_only and not args.rebuild:
         print("EduFlow 双入口已就绪。")
     else:
         for name in ("admin", "public"):
@@ -149,12 +201,65 @@ def main() -> int:
                 raise RuntimeError("双入口前端尚未构建，请执行 setup.ps1 或 npm run build。")
         execute([str(PYTHON), "scripts/runtime_config.py", "--files-only"], env, "检查本机私有文件权限…")
         execute([*compose, "config", "--quiet"], env, "验证默认关闭的网络配置…")
+        existing = subprocess.check_output(
+            [*compose, "ps", "--all", "--quiet", "postgres"], cwd=ROOT, env=env
+        ).strip()
+        marker = ROOT / ".runtime/private/postgres-image-id"
+        pg_image = config["services"]["postgres"]["image"]
+        if existing:
+            execute([*compose, "start", "--wait", "postgres"], env, "等待原 PostgreSQL 实例就绪…")
+            execute(
+                [str(PYTHON), "scripts/backup_before_migrate.py", docker, *compose[2:]],
+                env,
+                "替换数据库容器前，使用旧版 pg_dump 创建加密恢复点…",
+            )
+        else:
+            volume = config["volumes"]["postgres_data"]["name"]
+            volumes = subprocess.check_output([docker, "volume", "ls", "-q"], env=env, text=True).splitlines()
+            if volume in volumes:
+                image = subprocess.run(
+                    [docker, "image", "inspect", "--format", "{{.Id}}", pg_image],
+                    env=env,
+                    text=True,
+                    capture_output=True,
+                )
+                if (
+                    image.returncode
+                    or not marker.is_file()
+                    or marker.read_text().strip() != image.stdout.strip()
+                ):
+                    raise RuntimeError("发现脱离容器的原数据卷，请先使用原镜像启动并验证备份，再升级。")
+                execute(
+                    [*compose, "up", "--no-build", "--pull", "never", "-d", "--wait", "postgres"],
+                    env,
+                    "使用记录的原镜像加载现有卷…",
+                )
+                execute(
+                    [str(PYTHON), "scripts/backup_before_migrate.py", docker, *compose[2:]],
+                    env,
+                    "备份现有数据库…",
+                )
         execute(
-            [*compose, "up", "-d", "--wait", "postgres", "redis"],
+            [
+                *compose,
+                "up",
+                *(["--no-build", "--pull", "never"] if refs else ["--build"]),
+                "-d",
+                "--wait",
+                "postgres",
+                "redis",
+            ],
             env,
             "启动本机数据库与队列，保留原有数据卷…",
         )
-        execute([str(PYTHON), "scripts/backup_before_migrate.py", docker], env, "升级前生成本机加密备份…")
+        container_id = subprocess.check_output(
+            [*compose, "ps", "-q", "postgres"], env=env, cwd=ROOT, text=True
+        ).strip()
+        marker.write_bytes(
+            subprocess.check_output(
+                [docker, "inspect", "--format", "{{.Image}}", container_id], env=env
+            ).strip()
+        )
         execute([str(PYTHON), "-m", "eduflow.bootstrap.cli", "migrate"], env, "执行增量迁移…")
         execute(
             [str(PYTHON), "-m", "eduflow.bootstrap.cli", "initialize"],
@@ -166,22 +271,34 @@ def main() -> int:
         if args.prepare_only:
             print("准备完成；尚未启动双入口 API。")
             return 0
-        execute([*compose, "build", "worker"], env, "构建共享应用镜像，复用已缓存依赖…")
+        if not refs:
+            execute([*compose, "build", "worker"], env, "构建共享应用镜像，复用已缓存依赖…")
         execute(
-            [*compose, "up", "-d", "--wait", "worker", "beat", "admin-api", "public-api"],
+            [
+                *compose,
+                "up",
+                *(["--no-build", "--pull", "never"] if refs else []),
+                "-d",
+                "--wait",
+                "worker",
+                "beat",
+                "admin-api",
+                "public-api",
+            ],
             env,
             "启动隔离应用并等待健康检查…",
         )
         deadline = time.monotonic() + 120
-        while not all(ready(portal, port) for portal, port in ENDPOINTS):
+        while not all(ready(portal, port) for portal, port in endpoints):
             if time.monotonic() >= deadline:
                 raise RuntimeError("双入口健康检查超时，请查看私有启动日志。")
             time.sleep(1)
-    print("管理员：http://127.0.0.1:8000/login")
-    print("教师/学生：http://127.0.0.1:8100/login")
+    login_url = f"http://127.0.0.1:{endpoints[0][1]}/login"
+    print("管理员：" + login_url)
+    print(f"教师/学生：http://127.0.0.1:{endpoints[1][1]}/login")
     print("公网关闭。关闭此终端后容器继续运行；停止应用可执行 docker compose stop。")
     if not args.no_browser:
-        webbrowser.open("http://127.0.0.1:8000/login")
+        webbrowser.open(login_url)
     return 0
 
 

@@ -20,6 +20,7 @@ def main() -> None:
     command = [
         sys.argv[1],
         "compose",
+        *sys.argv[2:],
         "exec",
         "-T",
         "postgres",
