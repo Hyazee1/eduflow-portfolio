@@ -28,7 +28,7 @@ x-application: &application
 services:
   postgres:
     logging: *logging
-    image: ${EDUFLOW_POSTGRES_IMAGE:-eduflow-postgres:16.16-r1}
+    image: ${EDUFLOW_POSTGRES_IMAGE:-eduflow-postgres:16.16-alpine-r2}
     build: ./infra/postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-eduflow}

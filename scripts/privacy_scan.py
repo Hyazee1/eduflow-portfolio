@@ -25,6 +25,7 @@ TEXT = {
     ".txt",
     ".bat",
     ".ps1",
+    ".sh",
     ".html",
     ".svg",
     ".xml",
@@ -44,7 +45,8 @@ TEXT = {
 
 def is_text_candidate(path: Path) -> bool:
     return path.is_file() and (
-        path.suffix.lower() in TEXT or path.name in {"Dockerfile", ".gitignore", ".dockerignore", ".platform"}
+        path.suffix.lower() in TEXT
+        or path.name in {"Dockerfile", ".gitignore", ".gitattributes", ".dockerignore", ".platform"}
     )
 
 

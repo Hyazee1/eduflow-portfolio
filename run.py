@@ -154,6 +154,7 @@ def main() -> int:
             "--profile",
             "tools",
             "run",
+            "--no-deps",
             "--pull",
             "never" if refs else "missing",
             "--rm",
@@ -199,13 +200,29 @@ def main() -> int:
         for name in ("admin", "public"):
             if not (ROOT / "frontend/dist" / name / "index.html").is_file():
                 raise RuntimeError("双入口前端尚未构建，请执行 setup.ps1 或 npm run build。")
-        execute([str(PYTHON), "scripts/runtime_config.py", "--files-only"], env, "检查本机私有文件权限…")
         execute([*compose, "config", "--quiet"], env, "验证默认关闭的网络配置…")
         existing = subprocess.check_output(
             [*compose, "ps", "--all", "--quiet", "postgres"], cwd=ROOT, env=env
         ).strip()
         marker = ROOT / ".runtime/private/postgres-image-id"
         pg_image = config["services"]["postgres"]["image"]
+        if existing:
+            storage = subprocess.check_output(
+                [
+                    docker,
+                    "inspect",
+                    "--format",
+                    '{{index .Config.Labels "org.eduflow.postgres-storage"}}',
+                    existing,
+                ],
+                env=env,
+                text=True,
+            ).strip()
+            if storage != "pg16-alpine-icu":
+                raise RuntimeError(
+                    "发现旧 PostgreSQL 容器。请使用原环境备份，并在新的 Compose 项目和卷内逻辑恢复。"
+                )
+        execute([str(PYTHON), "scripts/runtime_config.py", "--files-only"], env, "检查本机私有文件权限…")
         if existing:
             execute([*compose, "start", "--wait", "postgres"], env, "等待原 PostgreSQL 实例就绪…")
             execute(

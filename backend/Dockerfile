@@ -1,5 +1,8 @@
 FROM postgres:16-trixie@sha256:40852951a80d9dfaf52a1eb1f75d477f3c379ee8b148a1f40b9fa14c56b6e8cc AS pgtools
-RUN mkdir /pg-libs && ldd /usr/lib/postgresql/16/bin/pg_dump /usr/lib/postgresql/16/bin/pg_restore | awk '/=> \// {print $3}' | sort -u | xargs -r cp -L -t /pg-libs
+# Use the security-updated Debian package for zstd in the final image.
+RUN mkdir /pg-libs \
+    && ldd /usr/lib/postgresql/16/bin/pg_dump /usr/lib/postgresql/16/bin/pg_restore \
+        | awk '/=> \// && $1 != "libzstd.so.1" {print $3}' | sort -u | xargs -r cp -L -t /pg-libs
 
 FROM python:3.12-slim-trixie@sha256:37fc60d303cb9294d3718b5b48998a0210bb1c73611c1399ef5eb7964c0536e5 AS python-base
 FROM python-base AS dependencies
@@ -10,6 +13,9 @@ RUN python -m pip install --no-cache-dir --require-hashes --only-binary=:all: -r
 
 FROM python-base
 WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends 'libzstd1=1.5.7+dfsg-1+deb13u1' \
+    && rm -rf /var/lib/apt/lists/*
 RUN python -m pip uninstall -y pip && rm -rf /usr/local/lib/python3.12/ensurepip \
     && useradd --uid 10001 --create-home eduflow
 COPY --from=dependencies /opt/venv /opt/venv

@@ -38,7 +38,7 @@ EduFlow 将师生可用时间、教师资质、教室容量与选课偏好转化
 .\.venv\Scripts\python.exe .\run.py doctor
 ```
 
-`setup.ps1` 使用锁文件安装依赖、构建两个前端，并在首次运行时生成本机配置。已有环境可直接启动。只准备开发环境和构建时使用 `.\setup.ps1 -SkipContainers`。VS Code 的「任务」菜单也提供启动和后端测试入口。 [部署步骤](docs/deployment.md)
+`setup.ps1` 使用锁文件安装依赖、构建两个前端，并在首次运行时生成本机配置。只准备开发环境和构建时使用 `.\setup.ps1 -SkipContainers`。VS Code 的「任务」菜单也提供启动和后端测试入口。已有 Debian 版数据卷的用户先按部署说明完成逻辑备份和新卷恢复。 [部署与升级步骤](docs/deployment.md)
 
 | 本机入口 | 角色 |
 |---|---|

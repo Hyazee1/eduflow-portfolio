@@ -18,3 +18,9 @@
 独立求解用例每次生成自己的候选。作品集固定展示 2026-11-09 业务周的历史生效版本，该版本共有 68 个课次、40 个覆盖时段和 736 项模拟确认。模拟发布至生效用时 91.69 秒。 [五页报告](portfolio/EduFlow-Case-Study.pdf) · [两版对比 SQL](../analytics/checks/CompareVersions.sql) · [两版汇总 CSV](../analytics/data/ScheduleComparison.csv) · [对账 SQL](../analytics/checks/Reconcile.sql)
 
 启动步骤、账号用途和复现要求见 [部署说明](deployment.md) 与 [分析说明](../analytics/README.md)。
+
+## 2026-11-25 镜像更新验收
+
+三种镜像使用同一份 2026-11-25 UTC 漏洞库断网复扫。按每种镜像的公告编号去重，最终 PostgreSQL 16.16 Alpine 3.24 和 Redis 7.4.12 均为 0 严重、0 高危。应用镜像为 0 严重、13 高危，高危公告在该漏洞库中均未列出修复版本。Debian 的 `libzstd1` 补丁已通过动态链接检查和加密备份恢复验证。[Debian 公告](https://security-tracker.debian.org/tracker/CVE-2026-124851)
+
+在独立的 Windows x64 / Docker Linux amd64 合成数据环境中，旧版 PostgreSQL 备份逻辑恢复到全新 Alpine 卷，34 张表、13,431 行校验一致。中文筛选、索引、资源排他约束、Redis AOF 读回、双入口重启、自带备份工具读回和旧卷回退均通过。后端 148 项通过，Chromium 完成 27 步流程。220 人独立求解满足 668/668 条需求和 40/40 个时段，硬冲突为 0。定稿 PDF、PBIX 与业务 CSV 摘要复核一致。[迁移与回退步骤](deployment.md)
