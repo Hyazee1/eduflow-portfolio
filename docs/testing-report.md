@@ -24,3 +24,9 @@
 三种镜像使用同一份 2026-11-25 UTC 漏洞库断网复扫。按每种镜像的公告编号去重，最终 PostgreSQL 16.16 Alpine 3.24 和 Redis 7.4.12 均为 0 严重、0 高危。应用镜像为 0 严重、13 高危，高危公告在该漏洞库中均未列出修复版本。Debian 的 `libzstd1` 补丁已通过动态链接检查和加密备份恢复验证。[Debian 公告](https://security-tracker.debian.org/tracker/CVE-2026-124851)
 
 在独立的 Windows x64 / Docker Linux amd64 合成数据环境中，旧版 PostgreSQL 备份逻辑恢复到全新 Alpine 卷，34 张表、13,431 行校验一致。中文筛选、索引、资源排他约束、Redis AOF 读回、双入口重启、自带备份工具读回和旧卷回退均通过。后端 148 项通过，Chromium 完成 27 步流程。220 人独立求解满足 668/668 条需求和 40/40 个时段，硬冲突为 0。定稿 PDF、PBIX 与业务 CSV 摘要复核一致。[迁移与回退步骤](deployment.md)
+
+## 2026-11-26 离线复扫
+
+更新后的公开漏洞库识别出 Redis 镜像的 OpenSSL 高危公告 `CVE-2026-124709`。Redis 7.4.12 的构建配置将 Alpine 签名的 `libssl3` 和 `libcrypto3` 固定为 `3.5.9-r2`。三份最终镜像按摘要断网复扫，PostgreSQL 和 Redis 均为 0 严重、0 高危，应用为 0 严重、13 项高危。该库未列出这 13 项的修复版本。[Alpine 安全数据库](https://secdb.alpinelinux.org/v3.22/main.json)
+
+用最终摘要再次验证了 Redis 认证、旧 AOF 读取、双入口启动及重启。148 项后端测试和 27 步 Chromium 流程均通过，另外核验了隔离数据库的加密备份和恢复。

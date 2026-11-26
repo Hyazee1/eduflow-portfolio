@@ -45,7 +45,7 @@ services:
     restart: unless-stopped
   redis:
     logging: *logging
-    image: ${EDUFLOW_REDIS_IMAGE:-eduflow-redis:7.4.12-r1}
+    image: ${EDUFLOW_REDIS_IMAGE:-eduflow-redis:7.4.12-r2}
     build: ./infra/redis
     command: [redis-server, --appendonly, "yes", --aclfile, /run/secrets/redis_acl]
     secrets: [redis_acl, redis_health]
